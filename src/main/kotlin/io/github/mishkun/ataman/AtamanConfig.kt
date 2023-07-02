@@ -42,8 +42,17 @@ class OpenAtamanConfigAction : DumbAwareAction() {
 object AtamanConfig {
     private const val ATAMAN_RC_FILENAME = ".atamanrc.config"
 
-    var parsedBindings: List<LeaderBinding> = emptyList()
+    data class Config(
+        val appearance: Appearance = Appearance(),
+        var bindings: List<LeaderBinding> = emptyList()
+    )
+    var config = Config()
 
+    data class Appearance(
+        var title: String? = "Ataman"
+    )
+
+    @Suppress("UNCHECKED_CAST")
     fun updateConfig(project: Project) {
         val rcFile = findOrCreateRcFile()
             ?: show(
@@ -51,8 +60,16 @@ object AtamanConfig {
                 title = "Ataman",
                 notificationType = NotificationType.ERROR
             ).let { return }
-        val values = try {
-            buildBindingsTree(project, execFile(rcFile))
+        try {
+            val file = ConfigFactory.parseFile(rcFile)
+            val cfg = Config()
+            if (file.hasPath("appearance.title")) {
+                cfg.appearance.title = file.getString("appearance.title")
+            }
+            if (file.hasPath("bindings")) {
+                cfg.bindings = buildBindingsTree(project, (file.getAnyRef("bindings") as Map<String, Any> ).toList())
+            }
+            config = cfg
         } catch (exception: ConfigException) {
             show(
                 message = "Config is malformed. Aborting...\n${exception.message}",
@@ -61,14 +78,12 @@ object AtamanConfig {
             )
             return
         }
-        parsedBindings = values
     }
 
     fun getKeyStroke(project: Project?, char: Char) = KeyStroke.getKeyStrokeForEvent(
-        // Ugly hack to get KEY_REALEASED keystroke
         KeyEvent(
             WindowManager.getInstance().getFrame(project),
-            KeyEvent.KEY_RELEASED,
+            KeyEvent.KEY_PRESSED,
             0,
             if (char.isUpperCase()) KeyEvent.SHIFT_DOWN_MASK else 0,
             KeyEvent.getExtendedKeyCodeForChar(char.code),
@@ -80,6 +95,9 @@ object AtamanConfig {
         # This file is written in HOCON (Human-Optimized Config Object Notation) format. 
         # For more information about HOCON see https://github.com/lightbend/config/blob/master/HOCON.md
         
+        appearance {
+            title: Ataman
+        }
         bindings {
             q { 
                 description: Session...
@@ -93,10 +111,7 @@ object AtamanConfig {
     private const val BINDINGS_KEYWORD = "bindings"
     private const val DESCRIPTION_KEYWORD = "description"
     private const val ACTION_ID_KEYWORD = "actionId"
-
-    @Suppress("UNCHECKED_CAST")
-    private fun execFile(file: File): List<Pair<String, Any>> =
-        (ConfigFactory.parseFile(file).root().unwrapped()[BINDINGS_KEYWORD] as Map<String, Any>).toList()
+    private const val APPEARANCE_KEYWORD = "appearance"
 
     @Suppress("UNCHECKED_CAST")
     private fun buildBindingsTree(project: Project?, bindingConfig: List<Pair<String, Any>>): List<LeaderBinding> {

@@ -12,8 +12,6 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
-import com.intellij.openapi.wm.WindowManager
-import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.popup.WizardPopup
 import com.intellij.ui.popup.list.ListPopupImpl
 import com.intellij.ui.speedSearch.SpeedSearchSupply
@@ -85,19 +83,15 @@ class TransparentLeaderAction : DumbAwareAction() {
 }
 
 class LeaderAction : DumbAwareAction() {
-
     override fun actionPerformed(event: AnActionEvent) {
-        val frame = WindowManager.getInstance().getFrame(event.project)!!
-        val point = RelativePoint.getCenterOf(frame.rootPane)
         LeaderPopup(
             event.project, LeaderListStep(
-                "Ataman",
+                AtamanConfig.config.appearance.title,
                 event.dataContext,
-                values = AtamanConfig.parsedBindings
+                values = AtamanConfig.config.bindings
             )
-        ).show(point)
+        ).showInBestPositionFor(event.dataContext)
     }
-
 }
 
 class LeaderListStep(title: String? = null, val dataContext: DataContext, values: List<LeaderBinding>) :
@@ -140,7 +134,7 @@ class LeaderPopup(
 
     init {
         step.values.forEach { binding ->
-            registerAction("handle${binding.key}", binding.key, object : AbstractAction() {
+            registerAction("${binding.key}", binding.key, object : AbstractAction() {
                 override fun actionPerformed(e: ActionEvent?) {
                     list.setSelectedValue(binding, true)
                     handleSelect(true)
